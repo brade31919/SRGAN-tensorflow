@@ -14,106 +14,8 @@ import scipy.misc as sic
 import numpy as np
 
 
-# Define the data loader
+# Define the dataloader
 def data_loader(FLAGS):
-    # Define the returned data batches
-    Data = collections.namedtuple('Data', 'paths, inputs, targets, image_count, steps_per_epoch')
-
-    #Check the input directory
-    if FLAGS.input_dir == 'None':
-        raise ValueError('Input directory is not provided')
-
-    if not os.path.exists(FLAGS.input_dir):
-        raise ValueError('Input directory not found')
-
-    image_list = os.listdir(FLAGS.input_dir)
-    image_list = [_ for _ in image_list if _.endswith('.png')]
-    if len(image_list)==0:
-        raise Exception('No png files in the input directory')
-
-    image_list = sorted(image_list)
-    image_list = [os.path.join(FLAGS.input_dir, _) for _ in image_list]
-
-    with tf.variable_scope('load_image'):
-        # define the image list queue
-        image_list_queue = tf.train.string_input_producer(image_list, shuffle=(FLAGS.mode == 'Train'), capacity=FLAGS.name_queue_capacity)
-        print('[Queue] image list queue use shuffle: %s'%(FLAGS.mode == 'Train'))
-
-        # Reading and decode the images
-        reader = tf.WholeFileReader(name='image_reader')
-        paths, image = reader.read(image_list_queue)
-        input_image = tf.image.decode_png(image)
-        input_image = tf.image.convert_image_dtype(input_image, dtype=tf.float32)
-
-        assertion = tf.assert_equal(tf.shape(input_image)[2], 3, message="image does not have 3 channels")
-        with tf.control_dependencies([assertion]):
-            input_image = tf.identity(input_image)
-
-        # Break apart the paired images and normalize to [-1, 1]
-        width = tf.shape(input_image)[1]
-        a_image = preprocess(input_image[:, :(width // 2), :])
-        b_image = preprocess(input_image[:, (width // 2):, :])
-
-
-        if FLAGS.which_direction == "AtoB":
-            inputs, targets = [a_image, b_image]
-        elif FLAGS.which_direction == "BtoA":
-            inputs, targets = [b_image, a_image]
-        else:
-            raise Exception("invalid direction")
-
-    # The data augmentation part
-    with tf.variable_scope('data_preprocessing'):
-        with tf.variable_scope('random_crop'):
-            # Check whether perform crop
-            if (FLAGS.random_crop is True) and (FLAGS.crop_size < FLAGS.train_image_width and
-                                                FLAGS.crop_size < FLAGS.train_image_height) and FLAGS.mode == 'train':
-                print('[Config] Use random crop')
-                inputs.set_shape([FLAGS.train_image_height, FLAGS.train_image_width, 3])
-                targets.set_shape([FLAGS.train_image_height, FLAGS.train_image_width, 3])
-                offset_w = tf.cast(tf.floor(tf.random_uniform([], 0, FLAGS.train_image_width - FLAGS.crop_size)), dtype=tf.int32)
-                offset_h = tf.cast(tf.floor(tf.random_uniform([], 0, FLAGS.train_image_height - FLAGS.crop_size)), dtype=tf.int32)
-
-                inputs = tf.image.crop_to_bounding_box(inputs, offset_h, offset_w, FLAGS.crop_size, FLAGS.crop_size)
-                targets = tf.image.crop_to_bounding_box(targets, offset_h, offset_w, FLAGS.crop_size, FLAGS.crop_size)
-            # Do not perform crop
-            else:
-                inputs = tf.identity(inputs)
-                targets = tf.identity(targets)
-
-        with tf.variable_scope('random_flip'):
-            # Check for random flip:
-            if (FLAGS.flip is True) and (FLAGS.mode == 'train'):
-                print('[Config] Use random flip')
-                # Produce the decision of random flip
-                decision = tf.random_uniform([], 0, 1, dtype=tf.float32)
-
-                input_images = random_flip(inputs, decision)
-                target_images = random_flip(targets, decision)
-            else:
-                input_images = tf.identity(inputs)
-                target_images = tf.identity(targets)
-
-    if FLAGS.mode == 'train':
-        paths_batch, inputs_batch, targets_batch = tf.train.shuffle_batch([paths, input_images, target_images],
-                                        batch_size=FLAGS.batch_size, capacity=FLAGS.image_queue_capacity,
-                                        min_after_dequeue=512, num_threads=20)
-    else:
-        paths_batch, inputs_batch, targets_batch = tf.train.batch([paths, input_images, target_images],
-                                        batch_size=FLAGS.batch_size, num_threads=20, allow_smaller_final_batch=True)
-
-    steps_per_epoch = int(math.ceil(len(image_list) / FLAGS.batch_size))
-
-    return Data(
-        paths=paths_batch,
-        inputs=inputs_batch,
-        targets=targets_batch,
-        image_count=len(image_list),
-        steps_per_epoch=steps_per_epoch
-    )
-
-
-def data_loader2(FLAGS):
     with tf.device('/cpu:0'):
         # Define the returned data batches
         Data = collections.namedtuple('Data', 'paths_LR, paths_HR, inputs, targets, image_count, steps_per_epoch')
@@ -337,63 +239,6 @@ def generator(gen_inputs, gen_output_channels, reuse=False, FLAGS=None):
     return net
 
 
-# Define the generator for the denoise task
-def generator_denoise(gen_inputs, gen_output_channels, reuse=False, FLAGS=None):
-    # Check the flag
-    if FLAGS is None:
-        raise ValueError('No FLAGS is provided for generator')
-
-    # The Bx residual blocks
-    def residual_block(inputs, output_channel, stride, scope):
-        with tf.variable_scope(scope):
-            net = conv2(inputs, 3, output_channel, stride, use_bias=False, scope='conv_1')
-            net = batchnorm(net, FLAGS.is_training)
-            net = prelu_tf(net)
-            net = conv2(net, 3, output_channel, stride, use_bias=False, scope='conv_2')
-            net = batchnorm(net, FLAGS.is_training)
-            net = net + inputs
-
-        return net
-
-    # [optional] Put network on different GPU
-    with tf.device('/gpu:0'):
-        with tf.variable_scope('generator_unit', reuse=reuse):
-            # The input layer
-            with tf.variable_scope('input_stage'):
-                net = conv2(gen_inputs, 9, 64, 1, scope='conv')
-                net = prelu_tf(net)
-
-            stage1_output = net
-
-            # The residual block parts
-            for i in range(1, FLAGS.num_resblock+1 , 1):
-                name_scope = 'resblock_%d'%(i)
-                net = residual_block(net, 64, 1, name_scope)
-
-        with tf.variable_scope('resblock_output'):
-            net = conv2(net, 3, 64, 1, use_bias=False, scope='conv')
-            net = batchnorm(net, FLAGS.is_training)
-
-        net = net + stage1_output
-
-    with tf.device('/gpu:0'):
-        with tf.variable_scope('refine_stage1'):
-            net = conv2(net, 3, 256, 1, scope='conv')
-            net = batchnorm(net, FLAGS.is_training)
-            net = prelu_tf(net)
-
-        with tf.variable_scope('refine_stage2'):
-            net = conv2(net, 3, 256, 1, scope='conv')
-            net = batchnorm(net, FLAGS.is_training)
-            net = prelu_tf(net)
-
-        with tf.variable_scope('output_stage'):
-            net = conv2(net, 9, gen_output_channels, 1, scope='conv')
-        print(net.get_shape(), 'output_stage')
-
-    return net
-
-
 # Definition of the discriminator
 def discriminator(dis_inputs, FLAGS=None):
     if FLAGS is None:
@@ -451,22 +296,6 @@ def discriminator(dis_inputs, FLAGS=None):
     return net
 
 
-# Define the feature extractor
-def VGG19_keras(type):
-    # Define the feature to extract according to the type of perceptual
-    if type == 'VGG54':
-        target_layer = 'block5_conv4'
-    elif type == 'VGG22':
-        target_layer = 'block2_conv2'
-    else:
-        raise NotImplementedError('Unknown perceptual type')
-    # Define the base model
-    base_model = VGG19(include_top=False, weights='imagenet')
-    extractor = Model(inputs=base_model.inputs, outputs=base_model.get_layer(target_layer).output)
-
-    return extractor
-
-
 def VGG19_slim(input, type, reuse, scope):
     # Define the feature to extract according to the type of perceptual
     if type == 'VGG54':
@@ -511,24 +340,26 @@ def SRGAN(inputs, targets, FLAGS):
         with tf.name_scope('vgg19_2') as scope:
             extracted_feature_target = VGG19_slim(targets, FLAGS.perceptual_mode, reuse=True, scope=scope)
 
+    # Use the VGG22 feature
     elif FLAGS.perceptual_mode == 'VGG22':
-        extractor = VGG19_keras(FLAGS.perceptual_mode)
-        extracted_feature_gen = extractor.call(gen_output)
-        extracted_feature_target = extractor.call(targets)
+        with tf.name_scope('vgg19_1') as scope:
+            extracted_feature_gen = VGG19_slim(gen_output, FLAGS.perceptual_mode, reuse=False, scope=scope)
+        with tf.name_scope('vgg19_2') as scope:
+            extracted_feature_target = VGG19_slim(targets, FLAGS.perceptual_mode, reuse=True, scope=scope)
 
+    # Use MSE loss directly
     elif FLAGS.perceptual_mode == 'MSE':
         extracted_feature_gen = gen_output
         extracted_feature_target = targets
 
     else:
-        raise NotImplementedError('Unknown perceptual type')
+        raise NotImplementedError('Unknown perceptual type!!')
 
     # Calculating the generator loss
     with tf.variable_scope('generator_loss'):
         # Content loss
         with tf.variable_scope('content_loss'):
             # Compute the euclidean distance between the two features
-            # check=tf.equal(extracted_feature_gen, extracted_feature_target)
             diff = extracted_feature_gen - extracted_feature_target
             if FLAGS.perceptual_mode == 'MSE':
                 content_loss = tf.reduce_mean(tf.reduce_sum(tf.square(diff), axis=[3]))
@@ -659,189 +490,6 @@ def SRResnet(inputs, targets, FLAGS):
         train=tf.group(update_loss, incr_global_step, gen_train),
         global_step=global_step,
         learning_rate=learning_rate
-    )
-
-
-# Use the denseNet version of the generator
-def SRResnet_dense(inputs, targets, FLAGS):
-    # Define the container of the parameter
-    Network = collections.namedtuple('Network', 'content_loss, gen_grads_and_vars, gen_output, train, global_step, \
-            learning_rate')
-
-    # Build the generator part
-    with tf.variable_scope('generator'):
-        output_channel = targets.get_shape().as_list()[-1]
-        gen_output = generatorDense(inputs, output_channel, reuse=False, FLAGS=FLAGS)
-        gen_output.set_shape([FLAGS.batch_size, FLAGS.crop_size * 4, FLAGS.crop_size * 4, 3])
-
-    # Use the VGG54 feature
-    if FLAGS.perceptual_mode == 'VGG54':
-        with tf.name_scope('vgg19_1') as scope:
-            extracted_feature_gen = VGG19_slim(gen_output, FLAGS.perceptual_mode, reuse=False, scope=scope)
-        with tf.name_scope('vgg19_2') as scope:
-            extracted_feature_target = VGG19_slim(targets, FLAGS.perceptual_mode, reuse=True, scope=scope)
-
-    elif FLAGS.perceptual_mode == 'VGG22':
-        with tf.name_scope('vgg19_1') as scope:
-            extracted_feature_gen = VGG19_slim(gen_output, FLAGS.perceptual_mode, reuse=False, scope=scope)
-        with tf.name_scope('vgg19_2') as scope:
-            extracted_feature_target = VGG19_slim(targets, FLAGS.perceptual_mode, reuse=True, scope=scope)
-
-    elif FLAGS.perceptual_mode == 'MSE':
-        extracted_feature_gen = gen_output
-        extracted_feature_target = targets
-
-    else:
-        raise NotImplementedError('Unknown perceptual type')
-
-    # Calculating the generator loss
-    with tf.variable_scope('generator_loss'):
-        # Content loss
-        with tf.variable_scope('content_loss'):
-            # Compute the euclidean distance between the two features
-            # check=tf.equal(extracted_feature_gen, extracted_feature_target)
-            diff = extracted_feature_gen - extracted_feature_target
-            if FLAGS.perceptual_mode == 'MSE':
-                content_loss = tf.reduce_mean(tf.reduce_sum(tf.square(diff), axis=[3]))
-            else:
-                content_loss = FLAGS.vgg_scaling * tf.reduce_mean(tf.reduce_sum(tf.square(diff), axis=[3]))
-
-        gen_loss = content_loss
-
-    # Define the learning rate and global step
-    with tf.variable_scope('get_learning_rate_and_global_step'):
-        global_step = tf.contrib.framework.get_or_create_global_step()
-        learning_rate = tf.train.exponential_decay(FLAGS.learning_rate, global_step, FLAGS.decay_step, FLAGS.decay_rate,
-                                                   staircase=FLAGS.stair)
-        incr_global_step = tf.assign(global_step, global_step + 1)
-
-    with tf.variable_scope('generator_train'):
-        # Need to wait discriminator to perform train step
-        with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
-            gen_tvars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='generator')
-            gen_optimizer = tf.train.AdamOptimizer(learning_rate, beta1=FLAGS.beta)
-            gen_grads_and_vars = gen_optimizer.compute_gradients(gen_loss, gen_tvars)
-            gen_train = gen_optimizer.apply_gradients(gen_grads_and_vars)
-
-    # [ToDo] If we do not use moving average on loss??
-    # exp_averager = tf.train.ExponentialMovingAverage(decay=0.99)
-    # update_loss = exp_averager.apply([content_loss])
-
-    return Network(
-        content_loss=content_loss,
-        gen_grads_and_vars=gen_grads_and_vars,
-        gen_output=gen_output,
-        train=tf.group(content_loss, incr_global_step, gen_train),
-        global_step=global_step,
-        learning_rate=learning_rate
-    )
-
-
-# Define the whole network architecture
-def network_denoise(inputs, targets, FLAGS):
-    # Define the container of the parameter
-    Network = collections.namedtuple('Network', 'discrim_real_output, discrim_fake_output, discrim_loss, \
-        discrim_grads_and_vars, adversarial_loss, content_loss, gen_grads_and_vars, gen_output, train, global_step, \
-        learning_rate')
-
-    # Build the generator part
-    with tf.variable_scope('generator'):
-        output_channel = targets.get_shape().as_list()[-1]
-        gen_output = generator_denoise(inputs, output_channel, reuse=False, FLAGS=FLAGS)
-        gen_output.set_shape([FLAGS.batch_size, FLAGS.crop_size, FLAGS.crop_size, 3])
-
-    # Build the fake discriminator
-    with tf.name_scope('fake_discriminator'):
-        with tf.variable_scope('discriminator', reuse=False):
-            discrim_fake_output = discriminator(gen_output, FLAGS=FLAGS)
-
-    # Build the real discriminator
-    with tf.name_scope('real_discriminator'):
-        with tf.variable_scope('discriminator', reuse=True):
-            discrim_real_output = discriminator(targets, FLAGS=FLAGS)
-
-    # Use the VGG54 feature
-    if FLAGS.perceptual_mode == 'VGG54':
-        with tf.name_scope('vgg19_1') as scope:
-            extracted_feature_gen = VGG19_slim(gen_output, FLAGS.perceptual_mode, reuse=False, scope=scope)
-        with tf.name_scope('vgg19_2') as scope:
-            extracted_feature_target = VGG19_slim(targets, FLAGS.perceptual_mode, reuse=True, scope=scope)
-
-    elif FLAGS.perceptual_mode == 'VGG22':
-        with tf.name_scope('vgg19_1') as scope:
-            extracted_feature_gen = VGG19_slim(gen_output, FLAGS.perceptual_mode, reuse=False, scope=scope)
-        with tf.name_scope('vgg19_2') as scope:
-            extracted_feature_target = VGG19_slim(targets, FLAGS.perceptual_mode, reuse=True, scope=scope)
-
-    elif FLAGS.perceptual_mode == 'MSE':
-        extracted_feature_gen = gen_output
-        extracted_feature_target = targets
-
-    else:
-        raise NotImplementedError('Unknown perceptual type')
-
-    # Calculating the generator loss
-    with tf.variable_scope('generator_loss'):
-        # Content loss
-        with tf.variable_scope('content_loss'):
-            # Compute the euclidean distance between the two features
-            if (FLAGS.perceptual_mode == 'VGG54') or (FLAGS.perceptual_mode == 'VGG22'):
-                diff = extracted_feature_gen - extracted_feature_target
-                content_loss = FLAGS.vgg_scaling * tf.reduce_mean(tf.reduce_sum(tf.square(diff), axis=[3]))
-            elif FLAGS.perceptual_mode == 'MSE':
-                diff = targets - gen_output
-                content_loss = tf.reduce_mean(tf.reduce_sum(tf.square(diff), axis=[3]))
-            else:
-                raise NotImplementedError('Unknown perceptual type')
-
-        with tf.variable_scope('adversarial_loss'):
-            adversarial_loss = tf.reduce_mean(-tf.log(discrim_fake_output + FLAGS.EPS))
-
-        gen_loss = content_loss + (FLAGS.ratio)*adversarial_loss
-
-    # Calculating the discriminator loss
-    with tf.variable_scope('discriminator_loss'):
-        discrim_fake_loss = tf.log(1 - discrim_fake_output + FLAGS.EPS)
-        discrim_real_loss = tf.log(discrim_real_output + FLAGS.EPS)
-
-        discrim_loss = tf.reduce_mean(-(discrim_fake_loss + discrim_real_loss))
-
-    # Define the learning rate and global step
-    with tf.variable_scope('get_learning_rate_and_global_step'):
-        global_step = tf.contrib.framework.get_or_create_global_step()
-        learning_rate = tf.train.exponential_decay(FLAGS.learning_rate, global_step, FLAGS.decay_step, FLAGS.decay_rate, staircase=FLAGS.stair)
-        incr_global_step = tf.assign(global_step, global_step + 1)
-
-    with tf.variable_scope('dicriminator_train'):
-        discrim_tvars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='discriminator')
-        discrim_optimizer = tf.train.AdamOptimizer(learning_rate, beta1=FLAGS.beta)
-        discrim_grads_and_vars = discrim_optimizer.compute_gradients(discrim_loss, discrim_tvars)
-        discrim_train = discrim_optimizer.apply_gradients(discrim_grads_and_vars)
-
-    with tf.variable_scope('generator_train'):
-        # Need to wait discriminator to perform train step
-        with tf.control_dependencies([discrim_train]+ tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
-            gen_tvars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='generator')
-            gen_optimizer = tf.train.AdamOptimizer(learning_rate, beta1=FLAGS.beta)
-            gen_grads_and_vars = gen_optimizer.compute_gradients(gen_loss, gen_tvars)
-            gen_train = gen_optimizer.apply_gradients(gen_grads_and_vars)
-
-    #[ToDo] If we do not use moving average on loss??
-    exp_averager = tf.train.ExponentialMovingAverage(decay=0.99)
-    update_loss = exp_averager.apply([discrim_loss, adversarial_loss, content_loss])
-
-    return Network(
-        discrim_real_output = discrim_real_output,
-        discrim_fake_output = discrim_fake_output,
-        discrim_loss = exp_averager.average(discrim_loss),
-        discrim_grads_and_vars = discrim_grads_and_vars,
-        adversarial_loss = exp_averager.average(adversarial_loss),
-        content_loss = exp_averager.average(content_loss),
-        gen_grads_and_vars = gen_grads_and_vars,
-        gen_output = gen_output,
-        train = tf.group(update_loss, incr_global_step, gen_train),
-        global_step = global_step,
-        learning_rate = learning_rate
     )
 
 

@@ -11,4 +11,13 @@ The result on BSD100, Set14, Set5 will be reported later. The code is highly ins
 ### Recommended
 * Ubuntu 16.04 with tensorflow GPU edition
 
-### Updated soon...
+### Getting Started
+
+```bash
+# clone the repository from github
+git clone https://github.com/brade31919/SRGAN-tensorflow.git
+cd SRGAN-tensorflow/
+
+# [optional] download the training dataset
+
+```

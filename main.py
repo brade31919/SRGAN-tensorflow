@@ -4,40 +4,39 @@ from __future__ import print_function
 
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
-import tensorflow.contrib.keras as keras
 import os
-from lib.model import data_loader2, generator, SRGAN, test_data_loader, save_images, SRResnet, \
-    SRResnet_dense, generator_denoise
+from lib.model import data_loader, generator, SRGAN, test_data_loader, save_images, SRResnet
 from lib.ops import *
 import math
 import time
 import numpy as np
-# import ipdb
 
 Flags = tf.app.flags
 
 # The system parameter
 Flags.DEFINE_string('output_dir', None, 'The output directory of the checkpoint')
 Flags.DEFINE_string('summary_dir', None, 'The dirctory to output the summary')
-Flags.DEFINE_string('mode', 'train', 'The mode of the model train, test, inference')
-Flags.DEFINE_string('checkpoint', None, 'The checkpoint needed to be restored')
-Flags.DEFINE_boolean('pre_trained_model', False, 'Whether using the pretrained model')
-Flags.DEFINE_boolean('is_training', True, 'Whether we are in the training phase')
-Flags.DEFINE_string('vgg_ckpt', './vgg19/vgg_19.ckpt', 'checkpoint file for the vgg19')
+Flags.DEFINE_string('mode', 'train', 'The mode of the model train, test.')
+Flags.DEFINE_string('checkpoint', None, 'If provided, the weight will be restored from the provided checkpoint')
+Flags.DEFINE_boolean('pre_trained_model', False, 'If set True, the weight will be loaded but the global_step will still '
+                                                 'be 0. If set False, you are going to continue the training. That is, '
+                                                 'the global_step will be initiallized from the checkpoint, too')
+Flags.DEFINE_string('pre_trained_model_type', 'SRResnet', 'The type of pretrained model (SRGAN or SRResnet)')
+Flags.DEFINE_boolean('is_training', True, 'Training => True, Testing => False')
+Flags.DEFINE_string('vgg_ckpt', './vgg19/vgg_19.ckpt', 'path to checkpoint file for the vgg19')
 Flags.DEFINE_string('task', None, 'The task: SRGAN, SRResnet')
-Flags.DEFINE_string('generator_type', None, 'The type of the generator: "original", "denseNet".')
 # The data preparing operation
-Flags.DEFINE_integer('batch_size', 128, 'Batch size of input')
+Flags.DEFINE_integer('batch_size', 16, 'Batch size of the input batch')
 Flags.DEFINE_string('input_dir_LR', None, 'The directory of the input resolution input data')
 Flags.DEFINE_string('input_dir_HR', None, 'The directory of the high resolution input data')
-Flags.DEFINE_integer('train_image_width', 154, 'The width of the training image (low resolution one')
-Flags.DEFINE_integer('train_image_height', 102, 'The height of the traing image (low resolution one')
-Flags.DEFINE_boolean('flip', True, 'Whether data augmentation is applied')
+Flags.DEFINE_boolean('flip', True, 'Whether random flip data augmentation is applied')
 Flags.DEFINE_boolean('random_crop', True, 'Whether perform the random crop')
 Flags.DEFINE_integer('crop_size', 24, 'The crop size of the training image')
-Flags.DEFINE_integer('name_queue_capacity', 512, 'The capacity of the filename queue')
-Flags.DEFINE_integer('image_queue_capacity', 1024, 'The capacity of the image queue')
-Flags.DEFINE_integer('queue_thread', 20, 'The threads of the queue')
+Flags.DEFINE_integer('name_queue_capacity', 2048, 'The capacity of the filename queue (suggest large to ensure'
+                                                  'enough random shuffle.')
+Flags.DEFINE_integer('image_queue_capacity', 2048, 'The capacity of the image queue (suggest large to ensure'
+                                                   'enough random shuffle')
+Flags.DEFINE_integer('queue_thread', 10, 'The threads of the queue (More threads can speedup the training process.')
 # Generator configuration
 Flags.DEFINE_integer('num_resblock', 16, 'How many residual blocks are there in the generator')
 # The content loss parameter
@@ -47,9 +46,9 @@ Flags.DEFINE_float('ratio', 0.001, 'The ratio between content loss and adversari
 Flags.DEFINE_float('vgg_scaling', 0.0061, 'The scaling factor for the perceptual loss if using vgg perceptual loss')
 # The training parameters
 Flags.DEFINE_float('learning_rate', 0.0001, 'The learning rate for the network')
-Flags.DEFINE_integer('decay_step', 20000, 'The steps needed to decay the learning rate')
+Flags.DEFINE_integer('decay_step', 500000, 'The steps needed to decay the learning rate')
 Flags.DEFINE_float('decay_rate', 0.1, 'The decay rate of each decay step')
-Flags.DEFINE_boolean('stair', False, 'Whether perform staircase decay')
+Flags.DEFINE_boolean('stair', False, 'Whether perform staircase decay. True => decay in discrete interval.')
 Flags.DEFINE_float('beta', 0.9, 'The beta1 parameter for the Adam optimizer')
 Flags.DEFINE_integer('max_epoch', None, 'The max epoch for the training')
 Flags.DEFINE_integer('max_iter', 1000000, 'The max iteration of the training')
@@ -64,7 +63,7 @@ FLAGS = Flags.FLAGS
 print_configuration_op(FLAGS)
 
 # Check the output_dir is given
-if FLAGS.output_dir == None:
+if FLAGS.output_dir is None:
     raise ValueError('The output directory is needed')
 
 # Check the output directory to save the checkpoint
@@ -78,14 +77,14 @@ if not os.path.exists(FLAGS.summary_dir):
 # The testing mode
 if FLAGS.mode == 'test':
     # Check the checkpoint
-    if FLAGS.checkpoint == None:
-        raise ValueError('The checkpoint is needed to performing the test.')
+    if FLAGS.checkpoint is None:
+        raise ValueError('The checkpoint file is needed to performing the test.')
 
     # In the testing time, no flip and crop is needed
     if FLAGS.flip == True:
         FLAGS.flip = False
 
-    if FLAGS.crop_size != None:
+    if FLAGS.crop_size is not None:
         FLAGS.crop_size = None
 
     # Declare the test data reader
@@ -97,10 +96,10 @@ if FLAGS.mode == 'test':
     path_HR = tf.placeholder(tf.string, shape=[], name='path_HR')
 
     with tf.variable_scope('generator'):
-        if FLAGS.task == 'denoise':
-            gen_output = generator_denoise(inputs_raw, 3, reuse=False, FLAGS=FLAGS)
-        elif FLAGS.task == 'SRGAN':
+        if FLAGS.task == 'SRGAN' or FLAGS.task == 'SRResnet':
             gen_output = generator(inputs_raw, 3, reuse=False, FLAGS=FLAGS)
+        else:
+            raise NotImplementedError('Unknown task!!')
 
     print('Finish building the network')
 
@@ -124,9 +123,9 @@ if FLAGS.mode == 'test':
             "targets": tf.map_fn(tf.image.encode_png, converted_targets, dtype=tf.string, name='target_pngs')
         }
 
-    # Define the weight initiallizer
-    var_list2 = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='generator')
-    weight_initiallizer = tf.train.Saver(var_list2)
+    # Define the weight initiallizer (In inference time, we only need to restore the weight of the generator)
+    var_list = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='generator')
+    weight_initiallizer = tf.train.Saver(var_list)
 
     # Define the initialization operation
     init_op = tf.global_variables_initializer()
@@ -154,27 +153,19 @@ if FLAGS.mode == 'test':
 # The training mode
 elif FLAGS.mode == 'train':
     # Load data for training and testing
-    # ToDo Add online noise adding and downscaling
-    data = data_loader2(FLAGS)
+    # ToDo Add online downscaling
+    data = data_loader(FLAGS)
     print('Data count = %d' % (data.image_count))
 
     # Connect to the network
     if FLAGS.task == 'SRGAN':
-        if FLAGS.generator_type == 'original':
-            Net = SRGAN(data.inputs, data.targets, FLAGS)
-        # elif FLAGS.generator_type == 'denseNet':
-        #     Net = SRResnet_dense(data.inputs, data.targets, FLAGS)
-        else:
-            raise ValueError('Unknown generator type')
+        Net = SRGAN(data.inputs, data.targets, FLAGS)
     elif FLAGS.task =='SRResnet':
-        if FLAGS.generator_type == 'original':
-            Net = SRResnet(data.inputs, data.targets, FLAGS)
-        elif FLAGS.generator_type == 'denseNet':
-            Net = SRResnet_dense(data.inputs, data.targets, FLAGS)
-        else:
-            raise ValueError('Unknown generator type')
+        Net = SRResnet(data.inputs, data.targets, FLAGS)
+    else:
+        raise NotImplementedError('Unknown task type')
 
-    print('Finish building the network!!')
+    print('Finish building the network!!!')
 
     # Convert the images output from the network
     with tf.name_scope('convert_image'):
@@ -220,11 +211,19 @@ elif FLAGS.mode == 'train':
     # Define the saver and weight initiallizer
     saver = tf.train.Saver(max_to_keep=10)
 
+    # The variable list
     var_list = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES)
+    # Here if we restore the weight from the SRResnet the var_list2 do not need to contain the discriminator weights
+    # On contrary, if you initial your weight from other SRGAN checkpoint, var_list2 need to contain discriminator
+    # weights.
     if FLAGS.task == 'SRGAN':
-            #var_list2 = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='generator') + \
-            #          tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='discriminator')
+        if FLAGS.pre_trained_model_type == 'SRGAN':
+            var_list2 = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='generator') + \
+                      tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='discriminator')
+        elif FLAGS.pre_trained_model_type == 'SRResnet':
             var_list2 = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='generator')
+        else:
+            raise ValueError('Unknown pre_trained model type!!')
     elif FLAGS.task == 'SRResnet':
         var_list2 = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='generator')
 
@@ -234,14 +233,10 @@ elif FLAGS.mode == 'train':
     if not FLAGS.perceptual_mode == 'MSE':
         vgg_var_list = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='vgg_19')
         vgg_restore = tf.train.Saver(vgg_var_list)
-    # print(vgg_var_list)
-    # init_op = tf.global_variables_initializer()
-    # merged_summary = tf.summary.merge_all()
-    # summary_op = tf.summary.FileWriter(logdir=FLAGS.summary_dir)
+
     # Start the session
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
-    # with tf.Session(config=config) as sess:
     # Use superviser to coordinate all queue and summary writer
     sv = tf.train.Supervisor(logdir=FLAGS.summary_dir, save_summaries_secs=0, saver=None)
     with sv.managed_session(config=config) as sess:
@@ -257,10 +252,6 @@ elif FLAGS.mode == 'train':
         if not FLAGS.perceptual_mode == 'MSE':
             vgg_restore.restore(sess, FLAGS.vgg_ckpt)
             print('VGG19 restored successfully!!')
-
-        # Coordinate from multiple threads
-        # coord = tf.train.Coordinator()
-        # threads = tf.train.start_queue_runners(sess=sess, coord=coord)
 
         # Performing the training
         if FLAGS.max_epoch is None:
@@ -294,14 +285,12 @@ elif FLAGS.mode == 'train':
                     fetches["global_step"] = Net.global_step
 
             if ((step+1) % FLAGS.summary_freq) == 0:
-                # fetches["summary"] = merged_summary
                 fetches["summary"] = sv.summary_op
 
             results = sess.run(fetches)
 
             if ((step + 1) % FLAGS.summary_freq) == 0:
                 print('Recording summary!!')
-                # summary_op.add_summary(results['summary'], results['global_step'])
                 sv.summary_writer.add_summary(results['summary'], results['global_step'])
 
             if ((step + 1) % FLAGS.display_freq) == 0:
@@ -322,15 +311,10 @@ elif FLAGS.mode == 'train':
                     print("PSNR", results["PSNR"])
                     print("content_loss", results["content_loss"])
                     print("learning_rate", results['learning_rate'])
-                #print('check', results['check'])
-
 
             if ((step +1) % FLAGS.save_freq) == 0:
                 print('Save the checkpoint')
                 saver.save(sess, os.path.join(FLAGS.output_dir, 'model'), global_step=sv.global_step)
-
-        # coord.request_stop()
-        # coord.join(threads)
 
         print('Optimization done!!!!!!!!!!!!')
 

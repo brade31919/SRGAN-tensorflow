@@ -5,7 +5,6 @@ from __future__ import print_function
 
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
-import tensorflow.contrib.keras as keras
 import pdb
 
 
@@ -56,13 +55,6 @@ def conv2_NCHW(batch_input, kernel=3, output_channel=64, stride=1, use_bias=True
                                activation_fn=None, weights_initializer=tf.contrib.layers.xavier_initializer(),
                                biases_initializer=None)
 
-# [ToDo]: Write a code to test this function, check the reuse of this model
-# Define our Prelu
-def prelu(inputs, input_shape):
-    prelu_unit = keras.layers.PReLU()
-    prelu_unit.build(input_shape)
-    return prelu_unit.call(inputs)
-
 
 # Define our tensorflow version PRelu
 def prelu_tf(inputs, name='Prelu'):
@@ -72,6 +64,7 @@ def prelu_tf(inputs, name='Prelu'):
     neg = alphas * (inputs - abs(inputs)) * 0.5
 
     return pos + neg
+
 
 # Define our Lrelu
 def lrelu(inputs, alpha):
@@ -151,14 +144,12 @@ def print_configuration_op(FLAGS):
 def compute_psnr(ref, target):
     ref = tf.cast(ref, tf.float32)
     target = tf.cast(target, tf.float32)
-    diff = tf.subtract(target, ref)
+    diff = target - ref
     sqr = tf.multiply(diff, diff)
     err = tf.reduce_sum(sqr)
     v = tf.shape(diff)[0] * tf.shape(diff)[1] * tf.shape(diff)[2] * tf.shape(diff)[3]
-    mse = tf.div(err, tf.cast(v, tf.float32))
-    c10 = tf.constant(10, tf.float32)
-    c255_2 = tf.multiply(tf.constant(255,tf.float32),tf.constant(255, tf.float32))
-    psnr = tf.multiply(c10, tf.div(tf.log(tf.div(c255_2, mse)), tf.log(c10)))
+    mse = err / tf.cast(v, tf.float32)
+    psnr = 10 * (tf.log(255 * 255 / mse) / tf.log(10))
 
     return psnr
 
