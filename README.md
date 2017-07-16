@@ -7,14 +7,28 @@ The result on BSD100, Set14, Set5 will be reported later. The code is highly ins
 * The result from the paper:
 <table>
     <tr>
-        <td>Downscaled</td>
+        <td>SRGAN result</td>
+        <td>Original</td>
         <td>SRGAN result</td>
         <td>Original</td>
     </tr>
     <tr>
-        <td><img src="./pic/SRGAN/baboon_LR.png" width="1600%"></td>
-        <td><img src="./pic/SRGAN/baboon_SRGAN-VGG54.png" width="99%"></td>
-        <td><img src="./pic/SRGAN/baboon_HR.png" width="99%"></td>
+        <td><img src="./pic/SRGAN/comic_SRGAN-VGG54.png" width="50%"></td>
+        <td><img src="./pic/SRGAN/comic_HR.png" width="50%"></td>
+        <td><img src="./pic/SRGAN/baboon_SRGAN-VGG54.png" width="50%"></td>
+        <td><img src="./pic/SRGAN/baboon_HR.png" width="50%"></td>
+    </tr>
+    <tr>
+        <td>Our result</td>
+        <td>Original</td>
+        <td>Our result</td>
+        <td>Original</td>
+    </tr>
+    <tr>
+        <td><img src="./pic/images/img_005-outputs.png" width="50%"></td>
+        <td><img src="./pic/images/img_005-targets.png" width="50%"></td>
+        <td><img src="./pic/images/img_001-outputs.png" width="50%"></td>
+        <td><img src="./pic/images/img_001-targets.png" width="50%"></td>
     </tr>
 </table>
 
