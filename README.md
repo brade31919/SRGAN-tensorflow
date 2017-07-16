@@ -12,9 +12,9 @@ The result on BSD100, Set14, Set5 will be reported later. The code is highly ins
         <td>Original</td>
     </tr>
     <tr>
-        <td><img src="./pic/SRGAN/baboon_LR.png" width="20%"></td>
-        <td><img src="./pic/SRGAN/baboon_SRGAN-VGG54.png" width="20%"></td>
-        <td><img src="./pic/SRGAN/baboon_HR.png" width="20%"></td>
+        <td><img src="./pic/SRGAN/baboon_LR.png" width="1600%"></td>
+        <td><img src="./pic/SRGAN/baboon_SRGAN-VGG54.png" width="99%"></td>
+        <td><img src="./pic/SRGAN/baboon_HR.png" width="99%"></td>
     </tr>
 </table>
 
