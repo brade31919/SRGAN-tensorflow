@@ -4,12 +4,9 @@ from __future__ import print_function
 
 import tensorflow as tf
 from lib.ops import *
-from lib.model_dense import generatorDense
 import collections
 import os
 import math
-from tensorflow.contrib.keras.api.keras.applications.vgg19 import VGG19
-from tensorflow.contrib.keras.api.keras.models import Model
 import scipy.misc as sic
 import numpy as np
 
