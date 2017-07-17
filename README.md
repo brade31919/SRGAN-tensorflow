@@ -65,7 +65,7 @@ The result on BSD100, Set14, Set5 will be reported later. The code is highly ins
 * Ubuntu 16.04 with tensorflow GPU edition
 
 ### Getting Started
-Throughout the project, we denote the directory you cloned the repo as ```SRGAN-tensorflow_ROOT```<br ?>
+Throughout the project, we denote the directory you cloned the repo as ```SRGAN-tensorflow_ROOT```<br />
 
 * #### Run test using pre-trained model
 ```bash
