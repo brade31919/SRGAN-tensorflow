@@ -52,20 +52,26 @@ The result on BSD100, Set14, Set5 will be reported later. The code is highly ins
 </table>
 
 ### Denpendency
+* python2.7
 * tensorflow (tested on r1.0, r1.2)
-* TF slim library
 * Download and extract the pre-trained model from my [google drive](https://drive.google.com/a/gapp.nthu.edu.tw/uc?id=0BxRIhBA0x8lHNDJFVjJEQnZtcmc&export=download)
+* Download the VGG19 weights from the [TF-slim models](http://download.tensorflow.org/models/vgg_19_2016_08_28.tar.gz)
+* The code is tested on:
+	* Ubuntu 14.04 LTS with CPU architecture x86_64 + Nvidia Titan X
+	* Ubuntu 16.04 LTS with CPU architecture x86_64 + Nvidia 1080, 1080Ti or Titan X
+
 
 ### Recommended
 * Ubuntu 16.04 with tensorflow GPU edition
 
 ### Getting Started
+Throughout the project, we denote the directory you cloned the repo as ```SRGAN-tensorflow_ROOT```<br ?>
 
 * #### Run test using pre-trained model
 ```bash
 # clone the repository from github
 git clone https://github.com/brade31919/SRGAN-tensorflow.git
-cd SRGAN-tensorflow/
+cd $SRGAN-tensorflow_ROOT/
 
 # Download the pre-trained model from the google-drive
 # Go to https://drive.google.com/a/gapp.nthu.edu.tw/uc?id=0BxRIhBA0x8lHNDJFVjJEQnZtcmc&export=download
@@ -75,7 +81,7 @@ tar xvf SRGAN_pre-trained.tar
 # Run the test mode
 sh test_SRGAN.sh
 
-#The result can be viewed at SRGAN-tensorflow/result/images/
+#The result can be viewed at $SRGAN-tensorflow_ROOT/result/images/
 ```
 <br />
 
@@ -83,7 +89,7 @@ sh test_SRGAN.sh
 
 #### Data and checkpoint preparation
 To run the training process, things will become a little complicated. Follow the steps below carefully!!<br />
-Go to the project root directory. Download the vgg weight from [TF-silm model](https://github.com/tensorflow/models/tree/master/slim)<br />
+Go to the project root directory. Download the vgg weight from [TF-silm model](http://download.tensorflow.org/models/vgg_19_2016_08_28.tar.gz)<br />
  
 ```bash
 # make the directory to put the vgg19 pre-trained model
@@ -136,7 +142,11 @@ CUDA_VISIBLE_DEVICES=0 python main.py \  #Set CUDA devices correctly if you use 
 After ensuring the configuration. execute the script:
 ```bash
 # Executing the script
+cd $SRGAN-tensorflow_ROOT/
 sh train_SRResnet.sh
+```
+Launch tensorboard to monitor the training process
+```bash
 # Launch the tensorboard
 cd ./experiment_SRResnet/log/
 tensorboard --logdir . 
@@ -193,7 +203,11 @@ CUDA_VISIBLE_DEVICES=0 python main.py \
  After ensuring the configuration. execute the script:
 ```bash
 # Executing the script
+cd $SRGAN-tensorflow_ROOT/
 sh train_SRGAN.sh
+```
+Launch the tensorboard to monitor the training process
+```bash
 # Launch the tensorboard
 cd ./experiment_SRGAN_MSE/log/
 tensorboard --logdir . 
@@ -258,7 +272,11 @@ CUDA_VISIBLE_DEVICES=0 python main.py \              #Set the place to put the c
 After ensuring the configuration. execute the script:
 ```bash
 # Executing the script
+cd $SRGAN-tensorflow_ROOT/
 sh train_SRGAN.sh
+```
+Launch tensorboard to monitor the training process
+```bash
 # Launch the tensorboard
 cd ./experiment_SRGAN_VGG54/log/
 tensorboard --logdir . 
@@ -290,7 +308,7 @@ The training process in the tensorboard should be like this
 
 ### More result on benchmark
 
-####Coming soon!!!
+#### Coming soon!!!
 
 ### Reference
 * [C. Ledig, L. Theis, F. Huszar, J. Caballero, A. Cunningham, A. Acosta, A. Aitken, A. Tejani, J. Totz, Z. Wang, W. Shi, Photo-Realistic Single Image Super-Resolution Using a Generative Adversarial Network, accepted at CVPR (oral), 2017.](https://arxiv.org/pdf/1609.04802.pdf)
