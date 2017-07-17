@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
 CUDA_VISIBLE_DEVICES=0 python main.py \
-    --output_dir ./experiment_SRResnet_dense/ \
-    --summary_dir ./experiment_SRResnet_dense/log/ \
+    --output_dir ./experiment_SRResnet/ \
+    --summary_dir ./experiment_SRResnet/log/ \
     --mode train \
     --is_training True \
     --task SRResnet \
-    --generator_type denseNet \
     --batch_size 16 \
     --flip True \
     --random_crop True \
