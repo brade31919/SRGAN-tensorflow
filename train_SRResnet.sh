@@ -5,17 +5,17 @@ CUDA_VISIBLE_DEVICES=0 python main.py \
     --mode train \
     --is_training True \
     --task SRResnet \
-    --batch_size 16 \
+    --batch_size 2 \
     --flip True \
     --random_crop True \
     --crop_size 24 \
-    --input_dir_LR ./data/RAISE_LR/ \
-    --input_dir_HR ./data/RAISE_HR/ \
+    --input_dir_LR ./data/test_LR/ \
+    --input_dir_HR ./data/test_HR/ \
     --num_resblock 16 \
     --name_queue_capacity 4096 \
     --image_queue_capacity 4096 \
     --perceptual_mode MSE \
-    --queue_thread 12 \
+    --queue_thread 4 \
     --ratio 0.001 \
     --learning_rate 0.0001 \
     --decay_step 400000 \
