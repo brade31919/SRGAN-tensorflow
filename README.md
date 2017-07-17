@@ -93,10 +93,10 @@ wget http://download.tensorflow.org/models/vgg_19_2016_08_28.tar.gz
 tar xvf ./vgg19_2016_08_28.tar.gz
 ```
 Download the training dataset. The dataset contains the 8156 images from the RAISE dataset. I preprocess all the TIFF images into png with 5x downscale as the high-resolution images. The low-resolution image is obtained by 4x downscale of the high-resolution image. <br />
-Download the two file from the google drive link: 
-[High-resolution images](https://drive.google.com/file/d/0BxRIhBA0x8lHYXNNVW5YS0I2eXM/view?usp=sharing)
-[Low-resolution images](https://drive.google.com/file/d/0BxRIhBA0x8lHNnJFVUR1MjdMWnc/view?usp=sharing)
-Put the two .tar files to SRGAN/data/. Go to project root (SRGAN/)
+Download the two file from the google drive link: <br />
+[High-resolution images](https://drive.google.com/file/d/0BxRIhBA0x8lHYXNNVW5YS0I2eXM/view?usp=sharing)<br />
+[Low-resolution images](https://drive.google.com/file/d/0BxRIhBA0x8lHNnJFVUR1MjdMWnc/view?usp=sharing)<br />
+Put the two .tar files to SRGAN/data/. Go to project root (SRGAN/)<br />
 
 Typically, we need to follow the training process in the paper
  1. Train the SRResnet with 1000000 iterations
