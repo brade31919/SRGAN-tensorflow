@@ -1,8 +1,8 @@
 # SRGAN-tensorflow
 
 ### Introduction
-This project is a tensorflow implementation of the impressive work  [Photo-Realistic Single Image Super-Resolution Using a Generative Adversarial Network](https://arxiv.org/pdf/1704.02470v1.pdf). \\
-The result is obtained following to same setting from the v5 edition of the [paper on arxiv](https://arxiv.org/pdf/1704.02470v1.pdf). However, due to limited resources, I train my network on the [RAISE dataset](http://mmlab.science.unitn.it/RAISE/) which contains 8156 high resoution images captured by good cameras. As the results showed below, the performance is close to the result presented in the paper without using the imagenet training set. \\
+This project is a tensorflow implementation of the impressive work  [Photo-Realistic Single Image Super-Resolution Using a Generative Adversarial Network](https://arxiv.org/pdf/1704.02470v1.pdf). <br />
+The result is obtained following to same setting from the v5 edition of the [paper on arxiv](https://arxiv.org/pdf/1704.02470v1.pdf). However, due to limited resources, I train my network on the [RAISE dataset](http://mmlab.science.unitn.it/RAISE/) which contains 8156 high resoution images captured by good cameras. As the results showed below, the performance is close to the result presented in the paper without using the imagenet training set. <br />
 The result on BSD100, Set14, Set5 will be reported later. The code is highly inspired by the [pix2pix-tensorflow](https://github.com/affinelayer/pix2pix-tensorflow).
 
 #### Some results:
@@ -92,8 +92,8 @@ cd vgg19/
 wget http://download.tensorflow.org/models/vgg_19_2016_08_28.tar.gz
 tar xvf ./vgg19_2016_08_28.tar.gz
 ```
-Download the training dataset. The dataset contains the 8156 images from the RAISE dataset. I preprocess all the TIFF images into png with 5x downscale as the high-resolution images. The low-resolution image is obtained by 4x downscale of the high-resolution image. \\
-Download the two file from the google drive link: \\
+Download the training dataset. The dataset contains the 8156 images from the RAISE dataset. I preprocess all the TIFF images into png with 5x downscale as the high-resolution images. The low-resolution image is obtained by 4x downscale of the high-resolution image. <br />
+Download the two file from the google drive link: 
 [High-resolution images](https://drive.google.com/file/d/0BxRIhBA0x8lHYXNNVW5YS0I2eXM/view?usp=sharing)
 [Low-resolution images](https://drive.google.com/file/d/0BxRIhBA0x8lHNnJFVUR1MjdMWnc/view?usp=sharing)
 Put the two .tar files to SRGAN/data/. Go to project root (SRGAN/)
