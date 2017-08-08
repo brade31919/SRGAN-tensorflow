@@ -5,7 +5,7 @@ from __future__ import print_function
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
 import os
-from lib.model import data_loader, generator, SRGAN, test_data_loader, save_images, SRResnet
+from lib.model import data_loader, generator, SRGAN, test_data_loader, inference_data_loader, save_images, SRResnet
 from lib.ops import *
 import math
 import time
@@ -149,6 +149,75 @@ if FLAGS.mode == 'test':
             filesets = save_images(results, FLAGS)
             for i, f in enumerate(filesets):
                 print('evaluate image', f['name'])
+
+
+# the inference mode (just perform super resolution on the input image)
+elif FLAGS.mode == 'inference':
+    # Check the checkpoint
+    if FLAGS.checkpoint is None:
+        raise ValueError('The checkpoint file is needed to performing the test.')
+
+    # In the testing time, no flip and crop is needed
+    if FLAGS.flip == True:
+        FLAGS.flip = False
+
+    if FLAGS.crop_size is not None:
+        FLAGS.crop_size = None
+
+    # Declare the test data reader
+    inference_data = inference_data_loader(FLAGS)
+
+    inputs_raw = tf.placeholder(tf.float32, shape=[1, None, None, 3], name='inputs_raw')
+    path_LR = tf.placeholder(tf.string, shape=[], name='path_LR')
+
+    with tf.variable_scope('generator'):
+        if FLAGS.task == 'SRGAN' or FLAGS.task == 'SRResnet':
+            gen_output = generator(inputs_raw, 3, reuse=False, FLAGS=FLAGS)
+        else:
+            raise NotImplementedError('Unknown task!!')
+
+    print('Finish building the network')
+
+    with tf.name_scope('convert_image'):
+        # Deprocess the images outputed from the model
+        inputs = deprocessLR(inputs_raw)
+        outputs = deprocess(gen_output)
+
+        # Convert back to uint8
+        converted_inputs = tf.image.convert_image_dtype(inputs, dtype=tf.uint8, saturate=True)
+        converted_outputs = tf.image.convert_image_dtype(outputs, dtype=tf.uint8, saturate=True)
+
+    with tf.name_scope('encode_image'):
+        save_fetch = {
+            "path_LR": path_LR,
+            "inputs": tf.map_fn(tf.image.encode_png, converted_inputs, dtype=tf.string, name='input_pngs'),
+            "outputs": tf.map_fn(tf.image.encode_png, converted_outputs, dtype=tf.string, name='output_pngs')
+        }
+
+    # Define the weight initiallizer (In inference time, we only need to restore the weight of the generator)
+    var_list = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='generator')
+    weight_initiallizer = tf.train.Saver(var_list)
+
+    # Define the initialization operation
+    init_op = tf.global_variables_initializer()
+
+    config = tf.ConfigProto()
+    config.gpu_options.allow_growth = True
+    with tf.Session(config=config) as sess:
+        # Load the pretrained model
+        print('Loading weights from the pre-trained model')
+        weight_initiallizer.restore(sess, FLAGS.checkpoint)
+
+        max_iter = len(inference_data.inputs)
+        print('Evaluation starts!!')
+        for i in range(max_iter):
+            input_im = np.array([inference_data.inputs[i]]).astype(np.float32)
+            path_lr = inference_data.paths_LR[i]
+            results = sess.run(save_fetch, feed_dict={inputs_raw: input_im, path_LR: path_lr})
+            filesets = save_images(results, FLAGS)
+            for i, f in enumerate(filesets):
+                print('evaluate image', f['name'])
+
 
 # The training mode
 elif FLAGS.mode == 'train':

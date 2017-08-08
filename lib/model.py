@@ -182,6 +182,42 @@ def test_data_loader(FLAGS):
     )
 
 
+# The inference data loader. Allow input image with different size
+def inference_data_loader(FLAGS):
+    # Get the image name list
+    if (FLAGS.input_dir_LR == 'None'):
+        raise ValueError('Input directory is not provided')
+
+    if not os.path.exists(FLAGS.input_dir_LR):
+        raise ValueError('Input directory not found')
+
+    image_list_LR_temp = os.listdir(FLAGS.input_dir_LR)
+    image_list_LR = [os.path.join(FLAGS.input_dir_LR, _) for _ in image_list_LR_temp if _.split('.')[-1] == 'png']
+
+    # Read in and preprocess the images
+    def preprocess_test(name):
+        im = sic.imread(name).astype(np.float32)
+        # check grayscale image
+        if im.shape[-1] != 3:
+            h, w = im.shape
+            temp = np.empty((h, w, 3), dtype=np.uint8)
+            temp[:, :, :] = im[:, :, np.newaxis]
+            im = temp.copy()
+        im = im / np.max(im)
+
+        return im
+
+    image_LR = [preprocess_test(_) for _ in image_list_LR]
+
+    # Push path and image into a list
+    Data = collections.namedtuple('Data', 'paths_LR, inputs')
+
+    return Data(
+        paths_LR=image_list_LR,
+        inputs=image_LR
+    )
+
+
 # Definition of the generator
 def generator(gen_inputs, gen_output_channels, reuse=False, FLAGS=None):
     # Check the flag
@@ -499,8 +535,10 @@ def save_images(fetches, FLAGS, step=None):
     in_path = fetches['path_LR']
     name, _ = os.path.splitext(os.path.basename(str(in_path)))
     fileset = {"name": name, "step": step}
-    for kind in ["inputs", "outputs", "targets"]:
-        filename = name + "-" + kind + ".png"
+
+    if FLAGS.mode == 'inference':
+        kind = "outputs"
+        filename = name + ".png"
         if step is not None:
             filename = "%08d-%s" % (step, filename)
         fileset[kind] = filename
@@ -508,7 +546,18 @@ def save_images(fetches, FLAGS, step=None):
         contents = fetches[kind][0]
         with open(out_path, "wb") as f:
             f.write(contents)
-    filesets.append(fileset)
+        filesets.append(fileset)
+    else:
+        for kind in ["inputs", "outputs", "targets"]:
+            filename = name + "-" + kind + ".png"
+            if step is not None:
+                filename = "%08d-%s" % (step, filename)
+            fileset[kind] = filename
+            out_path = os.path.join(image_dir, filename)
+            contents = fetches[kind][0]
+            with open(out_path, "wb") as f:
+                f.write(contents)
+        filesets.append(fileset)
     return filesets
 
 

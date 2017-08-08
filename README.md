@@ -85,6 +85,44 @@ sh test_SRGAN.sh
 ```
 <br />
 
+* #### Run the inference using pre-trained model on your own image
+```bash
+cd $SRGAN-tensorflow_ROOT/
+
+# Download the pre-trained model from the google-drive
+# Go to https://drive.google.com/a/gapp.nthu.edu.tw/uc?id=0BxRIhBA0x8lHNDJFVjJEQnZtcmc&export=download
+# Download the pre-trained model to SRGAN-tensorflow/
+tar xvf SRGAN_pre-trained.tar
+
+# put your png images in the your own directory
+# For example
+mkdir myImages
+# put some images in it
+```
+modify the path in inference_SRGAN.sh
+```bash
+#!/usr/bin/env bash
+CUDA_VISIBLE_DEVICES=0 python main.py \
+    --output_dir ./result/ \
+    --summary_dir ./result/log/ \
+    --mode inference \
+    --is_training False \
+    --task SRGAN \
+    --input_dir_LR ./data/myImages/ \        # Modify the path to your image path
+    --num_resblock 16 \
+    --perceptual_mode VGG54 \
+    --pre_trained_model True \
+    --checkpoint ./SRGAN_pre-trained/model-200000
+
+```
+```bash
+# Run the test mode
+sh inference_SRGAN.sh
+
+#The result can be viewed at $SRGAN-tensorflow_ROOT/result/images/
+```
+<br />
+
 * #### Run the training process
 
 #### Data and checkpoint preparation

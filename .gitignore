@@ -9,3 +9,5 @@ experiment_SRResnet/
 experiment_SRResnet/log/
 SRGAN_pre-trained/
 vgg19/
+result/
+.idea/
