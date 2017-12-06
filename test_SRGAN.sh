@@ -5,7 +5,7 @@ CUDA_VISIBLE_DEVICES=0 python main.py \
     --mode test \
     --is_training False \
     --task SRGAN \
-    --batch_size 16
+    --batch_size 16 \
     --input_dir_LR ./data/test_LR/ \
     --input_dir_HR ./data/test_HR/ \
     --num_resblock 16 \
