@@ -10,6 +10,7 @@ from lib.ops import *
 import math
 import time
 import numpy as np
+import sys
 
 Flags = tf.app.flags
 
@@ -58,6 +59,7 @@ Flags.DEFINE_integer('save_freq', 10000, 'The frequency of saving images')
 
 
 FLAGS = Flags.FLAGS
+FLAGS(sys.argv)
 
 # Print the configuration of the model
 print_configuration_op(FLAGS)
