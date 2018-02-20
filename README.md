@@ -1,8 +1,8 @@
 # SRGAN-tensorflow
 
 ### Introduction
-This project is a tensorflow implementation of the impressive work  [Photo-Realistic Single Image Super-Resolution Using a Generative Adversarial Network](https://arxiv.org/pdf/1704.02470v1.pdf). <br />
-The result is obtained following to same setting from the v5 edition of the [paper on arxiv](https://arxiv.org/pdf/1704.02470v1.pdf). However, due to limited resources, I train my network on the [RAISE dataset](http://mmlab.science.unitn.it/RAISE/) which contains 8156 high resoution images captured by good cameras. As the results showed below, the performance is close to the result presented in the paper without using the imagenet training set. <br />
+This project is a tensorflow implementation of the impressive work  [Photo-Realistic Single Image Super-Resolution Using a Generative Adversarial Network](https://arxiv.org/pdf/1609.04802.pdf). <br />
+The result is obtained following to same setting from the v5 edition of the [paper on arxiv](https://arxiv.org/pdf/1609.04802.pdf). However, due to limited resources, I train my network on the [RAISE dataset](http://mmlab.science.unitn.it/RAISE/) which contains 8156 high resoution images captured by good cameras. As the results showed below, the performance is close to the result presented in the paper without using the imagenet training set. <br />
 The result on BSD100, Set14, Set5 will be reported later. The code is highly inspired by the [pix2pix-tensorflow](https://github.com/affinelayer/pix2pix-tensorflow).
 
 #### Some results:
