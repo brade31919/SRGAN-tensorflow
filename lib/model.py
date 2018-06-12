@@ -332,9 +332,9 @@ def discriminator(dis_inputs, FLAGS=None):
 def VGG19_slim(input, type, reuse, scope):
     # Define the feature to extract according to the type of perceptual
     if type == 'VGG54':
-        target_layer = scope + 'vgg_19/conv5/conv5_4'
+        target_layer =  'vgg_19/conv5/conv5_4'
     elif type == 'VGG22':
-        target_layer = scope + 'vgg_19/conv2/conv2_2'
+        target_layer =  'vgg_19/conv2/conv2_2'
     else:
         raise NotImplementedError('Unknown perceptual type')
     _, output = vgg_19(input, is_training=False, reuse=reuse)
