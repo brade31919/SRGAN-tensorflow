@@ -142,17 +142,38 @@ def print_configuration_op(FLAGS):
 
 
 def compute_psnr(ref, target):
-    ref = tf.cast(ref, tf.float32)
-    target = tf.cast(target, tf.float32)
-    diff = target - ref
-    sqr = tf.multiply(diff, diff)
-    err = tf.reduce_sum(sqr)
-    v = tf.shape(diff)[0] * tf.shape(diff)[1] * tf.shape(diff)[2] * tf.shape(diff)[3]
-    mse = err / tf.cast(v, tf.float32)
-    psnr = 10. * (tf.log(255. * 255. / mse) / tf.log(10.))
+    psnr = tf.image.psnr(ref, target, max_val=255)
+    return psnr[0]
 
-    return psnr
+def compute_psnr_test(ref, target):
+    target_shape = tf.shape(target)
+    ref_ = tf.image.resize_image_with_crop_or_pad(ref,target_height=target_shape[1],target_width=target_shape[2])    
+    psnr = tf.image.psnr(ref_, target, max_val=255)
+    return psnr[0]
 
+def compute_ssim(ref,target):
+    ssim = tf.image.ssim(ref,target,max_val=255)
+    return ssim[0]
+
+def compute_ssim_test(ref,target):
+    target_shape = tf.shape(target)
+    ref_ = tf.image.resize_image_with_crop_or_pad(ref,target_height=target_shape[1],target_width=target_shape[2])
+    ssim = tf.image.ssim(ref_,target,max_val=255)
+    return ssim[0]
+
+def evaluation_metric(psnr_list,ssim_list):
+    count = len(psnr_list)
+    min_psnr = min(psnr_list)
+    max_psnr = max(psnr_list)
+    mean_psnr = sum(psnr_list)/len(psnr_list)
+    min_ssim = min(ssim_list)
+    max_ssim = max(ssim_list)
+    mean_ssim = sum(ssim_list)/len(ssim_list)
+
+    stats_psnr = {'count': count,'min_psnr': min_psnr, 'max_psnr': max_psnr, 'mean_psnr': mean_psnr }
+    stats_ssim = {'count': count,'min_ssim': min_ssim, 'max_ssim': max_ssim, 'mean_ssim' : mean_ssim }
+    
+    return stats_psnr, stats_ssim
 
 # VGG19 component
 def vgg_arg_scope(weight_decay=0.0005):
