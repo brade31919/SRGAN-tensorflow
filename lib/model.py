@@ -447,19 +447,18 @@ def SRGAN(inputs, targets, FLAGS,  devices = ['/gpu:%d'%i for i in range(8)]):
                                 learning_rate = tf.train.exponential_decay(FLAGS.learning_rate, global_step, FLAGS.decay_step, FLAGS.decay_rate, staircase=FLAGS.stair)
                                 incr_global_step = tf.assign(global_step, global_step + 1)
 
-                            #scope.reuse_variables()
-                            with tf.variable_scope('dicriminator_train',reuse=tf.AUTO_REUSE):
+                           with tf.variable_scope('dicriminator_train',reuse=tf.AUTO_REUSE):
                                 discrim_tvars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='discriminator')
                                 discrim_optimizer = tf.train.AdamOptimizer(learning_rate, beta1=FLAGS.beta)
                                 discrim_grads_and_vars = discrim_optimizer.compute_gradients(discrim_loss, discrim_tvars)
-                                discrim_train = discrim_optimizer.apply_gradients(discrim_grads_and_vars)
-                                scope.reuse_variables()
+                                #discrim_train = discrim_optimizer.apply_gradients(discrim_grads_and_vars)
+                                #scope.reuse_variables()
                             tower_grads_d.append(discrim_grads_and_vars)
                                 
                             scope.reuse_variables()
                             with tf.variable_scope('generator_train'):
                                 # Need to wait discriminator to perform train step
-                                with tf.control_dependencies([discrim_train]+ tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
+                                with tf.control_dependencies( tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
                                     gen_tvars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='generator')
                                     gen_optimizer = tf.train.AdamOptimizer(learning_rate, beta1=FLAGS.beta)
                                     gen_grads_and_vars = gen_optimizer.compute_gradients(gen_loss, gen_tvars)
@@ -470,10 +469,6 @@ def SRGAN(inputs, targets, FLAGS,  devices = ['/gpu:%d'%i for i in range(8)]):
     exp_averager = tf.train.ExponentialMovingAverage(decay=0.99)
     update_loss = exp_averager.apply([discrim_loss, adversarial_loss, content_loss])
     
-    #generator aggregation
-    avg_grads = average_gradients(tower_grads)
-    gen_train = gen_optimizer.apply_gradients(avg_grads)
-    all_outputs_g = tf.concat(tower_outputs, axis=0)
     
     #discriminator aggregation
     avg_grads_d = average_gradients(tower_grads_d)
@@ -481,6 +476,14 @@ def SRGAN(inputs, targets, FLAGS,  devices = ['/gpu:%d'%i for i in range(8)]):
     
     all_outputs_real_d = tf.concat(tower_outputs_real_d, axis=0)
     all_outputs_fake_d = tf.concat(tower_outputs_fake_d, axis=0)
+    
+    with tf.control_dependencies([discrim_train]):
+        #generator aggregation
+        avg_grads = average_gradients(tower_grads)
+        gen_train = gen_optimizer.apply_gradients(avg_grads)
+
+        all_outputs_g = tf.concat(tower_outputs, axis=0)
+    
     
     return Network(
         discrim_real_output = all_outputs_real_d,
