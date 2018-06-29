@@ -31,16 +31,34 @@ def deprocessLR(image):
 
 
 # Define the convolution building block
-def conv2(batch_input, kernel=3, output_channel=64, stride=1, use_bias=True, scope='conv'):
+def conv2(batch_input, kernel=3, output_channel=64, stride=1, use_bias=True, scope='conv',norm=None):
     # kernel: An integer specifying the width and height of the 2D convolution window
-    with tf.variable_scope(scope):
-        if use_bias:
-            return slim.conv2d(batch_input, output_channel, [kernel, kernel], stride, 'SAME', data_format='NHWC',
-                            activation_fn=None, weights_initializer=tf.contrib.layers.xavier_initializer())
-        else:
-            return slim.conv2d(batch_input, output_channel, [kernel, kernel], stride, 'SAME', data_format='NHWC',
-                            activation_fn=None, weights_initializer=tf.contrib.layers.xavier_initializer(),
-                            biases_initializer=None)
+    with tf.variable_scope(scope):     
+        if norm == None:
+            if use_bias:
+                return slim.conv2d(batch_input, output_channel, [kernel, kernel], stride, 'SAME', data_format='NHWC',
+                                activation_fn=None, weights_initializer=tf.contrib.layers.xavier_initializer())
+            else:
+                return slim.conv2d(batch_input, output_channel, [kernel, kernel], stride, 'SAME', data_format='NHWC',
+                                activation_fn=None, weights_initializer=tf.contrib.layers.xavier_initializer(),
+                                biases_initializer=None)
+        elif norm == 'weight_norm':
+            w = tf.get_variable("kernel", shape=[kernel, kernel, batch_input.get_shape()[-1], output_channel],                                                                    initializer=tf.contrib.layers.xavier_initializer())
+            x = tf.nn.conv2d(input=batch_input, filter=weight_norm(w, axis=[0,1,2]),strides=[1, stride, stride, 1], padding='SAME')
+            if use_bias:
+                bias = tf.get_variable("bias", [output_channel], initializer=tf.constant_initializer(0.0))
+                x = tf.nn.bias_add(x, bias)
+                
+            return x
+                
+        elif norm == 'spectral_norm': 
+            w = tf.get_variable("kernel", shape=[kernel, kernel, batch_input.get_shape()[-1], output_channel],                                                                    initializer=tf.contrib.layers.xavier_initializer())
+            x = tf.nn.conv2d(input=batch_input, filter=spectral_norm(w),strides=[1, stride, stride, 1], padding='SAME')
+            if use_bias:
+                bias = tf.get_variable("bias", [output_channel], initializer=tf.constant_initializer(0.0))
+                x = tf.nn.bias_add(x, bias)
+                
+            return x
 
 
 def conv2_NCHW(batch_input, kernel=3, output_channel=64, stride=1, use_bias=True, scope='conv_NCHW'):
@@ -77,10 +95,30 @@ def batchnorm(inputs, is_training):
 
 
 # Our dense layer
-def denselayer(inputs, output_size):
-    output = tf.layers.dense(inputs, output_size, activation=None, kernel_initializer=tf.contrib.layers.xavier_initializer())
+def denselayer(inputs, output_size,norm=None):
+    x = flatten(inputs)
+    shape = x.get_shape().as_list()
+    channels = shape[-1]
+    
+    if norm == None: 
+        output = tf.layers.dense(inputs, output_size, activation=None, kernel_initializer=tf.contrib.layers.xavier_initializer())
+    elif norm == 'weight_norm':
+        w = tf.get_variable("kernel", [channels, units], tf.float32,initializer=weight_init, regularizer=weight_regularizer)
+        bias = tf.get_variable("bias", [units],initializer=tf.constant_initializer(0.0))
+        output = tf.matmul(x, weight_norm(w)) + bias
+        
+    elif norm == 'spectral_norm':
+        w = tf.get_variable("kernel", [channels, units], tf.float32,initializer=weight_init, regularizer=weight_regularizer)
+        bias = tf.get_variable("bias", [units],initializer=tf.constant_initializer(0.0))
+        output = tf.matmul(x, spectral_norm(w)) + bias
+        
     return output
 
+def flatten(x) :
+    return tf.layers.flatten(x)
+
+def hw_flatten(x) :
+    return tf.reshape(x, shape=[x.shape[0], -1, x.shape[-1]])
 
 # The implementation of PixelShuffler
 def pixelShuffler(inputs, scale=2):
@@ -157,7 +195,7 @@ def compute_ssim(ref,target):
 
 def compute_ssim_test(ref,target):
     target_shape = tf.shape(target)
-    ref_ = tf.image.resize_image_with_crop_or_pad(ref,target_height=target_shape[1],target_width=target_shape[2])
+    ref_ = tf.image.resize_image_with_crop_or_pad(ref,target_height = target_shape[1],target_width = target_shape[2])
     ssim = tf.image.ssim(ref_,target,max_val=255)
     return ssim[0]
 
@@ -172,8 +210,51 @@ def evaluation_metric(psnr_list,ssim_list):
 
     stats_psnr = {'count': count,'min_psnr': min_psnr, 'max_psnr': max_psnr, 'mean_psnr': mean_psnr }
     stats_ssim = {'count': count,'min_ssim': min_ssim, 'max_ssim': max_ssim, 'mean_ssim' : mean_ssim }
-    
     return stats_psnr, stats_ssim
+
+#Data independent Weight Normalization 
+def weight_norm(v, axis=None, name=None, return_all=True,
+                       reuse=None,
+                       init=tf.random_normal_initializer(stddev=0.05)):
+    #v = tf.get_variable(name=name, shape=shape, dtype=tf.float32, initializer=init)
+    g = tf.get_variable(name=name+'g', shape=v.shape[-1], initializer=tf.constant_initializer(1),trainable=False)
+    
+    inv_norm = tf.rsqrt(tf.reduce_sum(tf.square(v), reduction_indices=axis))
+    w = v * g * inv_norm
+    return w
+
+
+#Data independent Spectral Normalization  
+
+def spectral_norm(w, iteration=1):
+    w_shape = w.shape.as_list()
+    w = tf.reshape(w, [-1, w_shape[-1]])
+
+    u = tf.get_variable("u", [1, w_shape[-1]], initializer=tf.truncated_normal_initializer(), trainable=False)
+
+    u_hat = u
+    v_hat = None
+    for i in range(iteration):
+        """
+        power iteration
+        Usually iteration = 1 will be enough
+        """
+        v_ = tf.matmul(u_hat, tf.transpose(w))
+        v_hat = l2_norm(v_)
+
+        u_ = tf.matmul(v_hat, w)
+        u_hat = l2_norm(u_)
+
+    sigma = tf.matmul(tf.matmul(v_hat, w), tf.transpose(u_hat))
+    w_norm = w / sigma
+
+    with tf.control_dependencies([u.assign(u_hat)]):
+        w_norm = tf.reshape(w_norm, w_shape)
+
+    return w_norm
+
+def l2_norm(v, eps=1e-12):
+    return v / (tf.reduce_sum(v ** 2) ** 0.5 + eps)
 
 # VGG19 component
 def vgg_arg_scope(weight_decay=0.0005):
@@ -241,3 +322,4 @@ def vgg_19(inputs,
 
       return net, end_points
 vgg_19.default_image_size = 224
+
