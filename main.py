@@ -55,7 +55,9 @@ Flags.DEFINE_integer('max_iter', 1000000, 'The max iteration of the training')
 Flags.DEFINE_integer('display_freq', 20, 'The diplay frequency of the training process')
 Flags.DEFINE_integer('summary_freq', 100, 'The frequency of writing summary')
 Flags.DEFINE_integer('save_freq', 10000, 'The frequency of saving images')
-
+Flags.DEFINE_integer('num_gpus', 1, 'Number of GPUs')
+Flags.DEFINE_string('w_norm', None, 'Normalization to applied on weights of matrices weight_norm or spectral_norm')
+Flags.DEFINE_boolean('attention', False, 'Attention layer according to SAGAN')
 
 FLAGS = Flags.FLAGS
 
@@ -118,9 +120,11 @@ if FLAGS.mode == 'test':
         save_fetch = {
             "path_LR": path_LR,
             "path_HR": path_HR,
-            "inputs": tf.map_fn(tf.image.encode_png, converted_inputs, dtype=tf.string, name='input_pngs'),
-            "outputs": tf.map_fn(tf.image.encode_png, converted_outputs, dtype=tf.string, name='output_pngs'),
-            "targets": tf.map_fn(tf.image.encode_png, converted_targets, dtype=tf.string, name='target_pngs')
+            "SSIM": compute_ssim_test(converted_targets,converted_outputs),
+            "psnr": compute_psnr_test(converted_targets,converted_outputs),
+            "inputs": tf.map_fn(tf.image.encode_jpeg, converted_inputs, dtype=tf.string, name='input_pngs'),
+            "outputs": tf.map_fn(tf.image.encode_jpeg, converted_outputs, dtype=tf.string, name='output_pngs'),
+            "targets": tf.map_fn(tf.image.encode_jpeg, converted_targets, dtype=tf.string, name='target_pngs')
         }
 
     # Define the weight initiallizer (In inference time, we only need to restore the weight of the generator)
@@ -132,24 +136,35 @@ if FLAGS.mode == 'test':
 
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
+    config.log_device_placement = True
     with tf.Session(config=config) as sess:
         # Load the pretrained model
         print('Loading weights from the pre-trained model')
         weight_initiallizer.restore(sess, FLAGS.checkpoint)
-
+        psnr_list = []
+        ssim_list = []
         max_iter = len(test_data.inputs)
-        print('Evaluation starts!!')
+        print('Evaluation starts!!',max_iter)
         for i in range(max_iter):
             input_im = np.array([test_data.inputs[i]]).astype(np.float32)
             target_im = np.array([test_data.targets[i]]).astype(np.float32)
             path_lr = test_data.paths_LR[i]
+            #print('path_lr', path_lr)
             path_hr = test_data.paths_HR[i]
             results = sess.run(save_fetch, feed_dict={inputs_raw: input_im, targets_raw: target_im,
                                                       path_LR: path_lr, path_HR: path_hr})
+            #psnr = sess.run(psnr, feed_dict={inputs_raw: input_im, targets_raw: target_im,
+#                                                      path_LR: path_lr, path_HR: path_hr})
+            #print('psnr: ', results['psnr'])
+            ssim_list.append(results['SSIM'])
+            psnr_list.append(results['psnr'])
+            #print('ssim: ',results['SSIM'])
             filesets = save_images(results, FLAGS)
             for i, f in enumerate(filesets):
                 print('evaluate image', f['name'])
-
+        stats_psnr, stats_ssim = evaluation_metric(psnr_list, ssim_list)
+        print('stats psnr:  ', stats_psnr)
+        print('stats ssim:', stats_ssim )
 
 # the inference mode (just perform super resolution on the input image)
 elif FLAGS.mode == 'inference':
@@ -386,6 +401,7 @@ elif FLAGS.mode == 'train':
                 saver.save(sess, os.path.join(FLAGS.output_dir, 'model'), global_step=sv.global_step)
 
         print('Optimization done!!!!!!!!!!!!')
+
 
 
 
