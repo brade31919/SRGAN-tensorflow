@@ -290,39 +290,40 @@ def discriminator(dis_inputs, FLAGS=None):
         with tf.variable_scope('discriminator_unit'):
             # The input layer
             with tf.variable_scope('input_stage'):
-                net = conv2(dis_inputs, 3, 64, 1, scope='conv')
+                net = conv2(dis_inputs, 3, 256, 1, scope='conv')
                 net = lrelu(net, 0.2)
 
             # The discriminator block part
             # block 1
-            net = discriminator_block(net, 64, 3, 2, 'disblock_1')
+            net = discriminator_block(net, 128, 3, 1, 'disblock_1')
 
             # block 2
             net = discriminator_block(net, 128, 3, 1, 'disblock_2')
 
             # block 3
-            net = discriminator_block(net, 128, 3, 2, 'disblock_3')
+            net = discriminator_block(net, 64, 3, 1, 'disblock_3')
 
             # block 4
-            net = discriminator_block(net, 256, 3, 1, 'disblock_4')
+            net = discriminator_block(net, 64, 3, 1, 'disblock_4')
 
             # block 5
-            net = discriminator_block(net, 256, 3, 2, 'disblock_5')
+            net = discriminator_block(net, 32, 3, 1, 'disblock_5')
 
             # block 6
-            net = discriminator_block(net, 512, 3, 1, 'disblock_6')
+            net = discriminator_block(net, 32, 3, 1, 'disblock_6')
 
             # block_7
-            net = discriminator_block(net, 512, 3, 2, 'disblock_7')
+            net = discriminator_block(net, 16, 3, 1, 'disblock_7')
+
+            # The dense layer 1
+            #with tf.variable_scope('dense_layer_1'):
+                #net = slim.flatten(net)
+                #net = denselayer(net, 1024)
+                #net = lrelu(net, 0.2)
 
             # The dense layer 1
             with tf.variable_scope('dense_layer_1'):
                 net = slim.flatten(net)
-                net = denselayer(net, 1024)
-                net = lrelu(net, 0.2)
-
-            # The dense layer 2
-            with tf.variable_scope('dense_layer_2'):
                 net = denselayer(net, 1)
                 net = tf.nn.sigmoid(net)
 
