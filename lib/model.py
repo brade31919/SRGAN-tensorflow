@@ -225,15 +225,17 @@ def generator(gen_inputs, gen_output_channels, reuse=False, FLAGS=None):
         raise  ValueError('No FLAGS is provided for generator')
 
     #The ResDense block
-    def residual_dense_block(inputs, output_channel, stride,scope):
+    def residual_dense_block(inputs,growth_channel, output_channel, stride,scope):
+        growth_channel=32
+        output_channel=64
         with tf.variable_scope(scope):
-            net_1=conv2(inputs,3,output_channel,stride,use_bias=False, scope='conv_1')
+            net_1=conv2(inputs,3,growth_channel,stride,use_bias=False, scope='conv_1')
             net_1=prelu_tf(net_1)
-            net_2=conv2(net_1+inputs,3,output_channel,stride,use_bias=False,scope='conv_2')
+            net_2=conv2(net_1+inputs,3,growth_channel,stride,use_bias=False,scope='conv_2')
             net_2=prelu_tf(net_2)
-            net_3=conv2(net_2+net_1+inputs,3,output_channel,stride,use_bias=False, scope='conv_1')
+            net_3=conv2(net_2+net_1+inputs,3,growth_channel,stride,use_bias=False, scope='conv_1')
             net_3=prelu_tf(net_3)
-            net_4=conv2(net_3+net_2+net_1+inputs,3,output_channel,stride,use_bias=False,scope='conv_2')
+            net_4=conv2(net_3+net_2+net_1+inputs,3,growth_channel,stride,use_bias=False,scope='conv_2')
             net_4=prelu_tf(net_4)
             net_5=conv2(net_4+net_3+net_2+net_1+inputs,3,output_channel,stride,use_bias=False, scope='conv_1')
             net_5=prelu_tf(net_5)
@@ -241,11 +243,11 @@ def generator(gen_inputs, gen_output_channels, reuse=False, FLAGS=None):
         return net
 
     # The RRDB blocks
-    def rrdb(inputs, output_channel, stride, scope):
+    def rrdb(inputs,growth_channel, output_channel, stride, scope):
         with tf.variable_scope(scope):
-            net = residual_dense_block(inputs,output_channel,stride,use_bias=False,scope='residual_dense_block_1')
-            net = residual_dense_block(net,output_channel,stride,use_bias=False,scope='residual_dense_block_2')
-            net = residual_dense_block(net,output_channel,stride,use_bias=False,scope='residual_dense_block_3')
+            net = residual_dense_block(inputs,growth_channel,output_channel,stride,use_bias=False,scope='residual_dense_block_1')
+            net = residual_dense_block(net,growth_channel,output_channel,stride,use_bias=False,scope='residual_dense_block_2')
+            net = residual_dense_block(net,growth_channel,output_channel,stride,use_bias=False,scope='residual_dense_block_3')
             net = 0.2*net + inputs
 
         return net
@@ -262,7 +264,7 @@ def generator(gen_inputs, gen_output_channels, reuse=False, FLAGS=None):
         # The residual block parts
         for i in range(1, FLAGS.num_resblock+1 , 1):
             name_scope = 'rrdb_%d'%(i)
-            net = rrdb(net, 64, 1, name_scope)
+            net = rrdb(net,32, 64, 1, name_scope)
 
         with tf.variable_scope('resblock_output'):
             net = conv2(net, 3, 64, 1, use_bias=False, scope='conv')
