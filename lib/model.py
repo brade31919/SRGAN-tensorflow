@@ -240,12 +240,12 @@ def generator(gen_inputs, gen_output_channels, reuse=False, FLAGS=None):
             net= 0.2*net_5+ inputs
         return net
 
-    # The Bx residual blocks
+    # The RRDB blocks
     def rrdb(inputs, output_channel, stride, scope):
         with tf.variable_scope(scope):
-            net = self.residual_dense_block(inputs,output_channel,stride,use_bias=False,scope='residual_dense_block_1')
-            net = self.residual_dense_block(net,output_channel,stride,use_bias=False,scope='residual_dense_block_2')
-            net = self.residual_dense_block(net,output_channel,stride,use_bias=False,scope='residual_dense_block_3')
+            net = residual_dense_block(inputs,output_channel,stride,use_bias=False,scope='residual_dense_block_1')
+            net = residual_dense_block(net,output_channel,stride,use_bias=False,scope='residual_dense_block_2')
+            net = residual_dense_block(net,output_channel,stride,use_bias=False,scope='residual_dense_block_3')
             net = 0.2*net + inputs
 
         return net
