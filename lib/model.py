@@ -412,9 +412,9 @@ def SRGAN(inputs, targets, FLAGS):
             # Compute the euclidean distance between the two features
             diff = extracted_feature_gen - extracted_feature_target
             if FLAGS.perceptual_mode == 'MSE':
-                content_loss = tf.reduce_mean(tf.reduce_sum(tf.square(diff), axis=[3]))
+                content_loss = tf.reduce_mean(tf.reduce_sum(tf.abs(diff), axis=[3]))
             else:
-                content_loss = FLAGS.vgg_scaling*tf.reduce_mean(tf.reduce_sum(tf.square(diff), axis=[3]))
+                content_loss = FLAGS.vgg_scaling*tf.reduce_mean(tf.reduce_sum(tf.abs(diff), axis=[3]))
 
         with tf.variable_scope('adversarial_loss'):
             adversarial_loss = tf.reduce_mean(-tf.log(discrim_fake_output + FLAGS.EPS))
