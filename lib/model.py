@@ -225,7 +225,7 @@ def generator(gen_inputs, gen_output_channels, reuse=False, FLAGS=None):
         raise  ValueError('No FLAGS is provided for generator')
 
     #The ResDense block
-    def residual_dense_block(inputs,growth_channel, output_channel, stride,scope):
+    def residual_dense_block(inputs,growth_channel, output_channel,use_bias, stride,scope):
         growth_channel=32
         output_channel=64
         with tf.variable_scope(scope):
@@ -243,7 +243,7 @@ def generator(gen_inputs, gen_output_channels, reuse=False, FLAGS=None):
         return net
 
     # The RRDB blocks
-    def rrdb(inputs,growth_channel, output_channel, stride, scope):
+    def rrdb(inputs,growth_channel, output_channel, stride,use_bias, scope):
         with tf.variable_scope(scope):
             net = residual_dense_block(inputs,growth_channel,output_channel,stride,use_bias=False,scope='residual_dense_block_1')
             net = residual_dense_block(net,growth_channel,output_channel,stride,use_bias=False,scope='residual_dense_block_2')
@@ -264,7 +264,7 @@ def generator(gen_inputs, gen_output_channels, reuse=False, FLAGS=None):
         # The residual block parts
         for i in range(1, FLAGS.num_resblock+1 , 1):
             name_scope = 'rrdb_%d'%(i)
-            net = rrdb(net,32, 64, 1, name_scope)
+            net = rrdb(net,32, 64, 1,False, name_scope)
 
         with tf.variable_scope('resblock_output'):
             net = conv2(net, 3, 64, 1, use_bias=False, scope='conv')
