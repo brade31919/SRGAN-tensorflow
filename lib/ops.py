@@ -4,7 +4,11 @@ from __future__ import print_function
 
 
 import tensorflow as tf
-import tensorflow.contrib.slim as slim
+
+#first upgrade it because tf.contrib.slim functionalities and no longer works after upgrading to tensorflow to 2.0.
+#using pip install --upgrade tf_slim
+#then use import tf_slim as slim insted of import tensorflow.contrib.slim as slim
+import tf_slim as slim
 import pdb
 
 
@@ -68,7 +72,7 @@ def prelu_tf(inputs, name='Prelu'):
 
 # Define our Lrelu
 def lrelu(inputs, alpha):
-    return keras.layers.LeakyReLU(alpha=alpha).call(inputs)
+    return tf.keras.layers.LeakyReLU(alpha=alpha).call(inputs)
 
 
 def batchnorm(inputs, is_training):
